@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BINGO BONGO</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin: 0 0 20px 0;
+        }
+        
+        .status {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #555;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .tile {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: #f5f5f5;
+            cursor: pointer;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .tile:hover {
+            transform: scale(1.05);
+            border-color: #999;
+        }
+        
+        .tile.flipped {
+            background: #4caf50;
+            border-color: #45a049;
+            color: white;
+        }
+        
+        .tile.suggest-1 {
+            background: #FFD700;
+            border-color: #DAA520;
+        }
+        
+        .tile.suggest-2 {
+            background: #FFA500;
+            border-color: #FF8C00;
+        }
+        
+        .tile.suggest-3 {
+            background: #FFB84D;
+            border-color: #FF9800;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .suggest-btn {
+            background: #8888ff;
+            color: white;
+        }
+        
+        .reset-btn {
+            background: #ff8888;
+            color: white;
+        }
+        
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>BINGO BONGO</h1>
+        <div class="status" id="status">Flips used: 0 / 16</div>
+        <div class="grid" id="grid"></div>
+        <div class="controls">
+            <button class="suggest-btn" onclick="suggestMove()">Suggest Next Move</button>
+            <button class="reset-btn" onclick="resetBoard()">Reset Board</button>
+        </div>
+
+    </div>
+
+    <script>
+        const GRID_SIZE = 5;
+        const MAX_FLIPS = 16;
+        const TOTAL_CHOSEN_FLIPS = 8;
+        const LOW_ATTEMPT_THRESHOLD = 3;
+        
+        let state = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+        let turnFlips = 0;
+        let tiles = {};
+        
+        function initGrid() {
+            const grid = document.getElementById('grid');
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    tile.onclick = () => toggleTile(r, c);
+                    grid.appendChild(tile);
+                    tiles[`${r},${c}`] = tile;
+                }
+            }
+        }
+        
+        function toggleTile(r, c) {
+            if (state[r][c] === 1) {
+                state[r][c] = 0;
+                tiles[`${r},${c}`].className = 'tile';
+                tiles[`${r},${c}`].textContent = '';
+                turnFlips--;
+            } else {
+                if (turnFlips >= MAX_FLIPS) {
+                    console.log('All 16 flips used.');
+                    return;
+                }
+                state[r][c] = 1;
+                tiles[`${r},${c}`].className = 'tile flipped';
+                tiles[`${r},${c}`].textContent = '';
+                turnFlips++;
+            }
+            clearHighlights();
+            updateStatus();
+        }
+        
+        function resetBoard() {
+            state = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            for (let key in tiles) {
+                tiles[key].className = 'tile';
+                tiles[key].textContent = '';
+            }
+            turnFlips = 0;
+            updateStatus();
+            document.getElementById('debug').classList.remove('visible');
+        }
+        
+        function updateStatus() {
+            document.getElementById('status').textContent = `Flips used: ${turnFlips} / ${MAX_FLIPS}`;
+        }
+        
+        function getLineFlips(currentState) {
+            const lineFlips = [];
+            for (let i = 0; i < GRID_SIZE; i++) {
+                lineFlips.push(currentState[i].reduce((a, b) => a + b, 0));
+            }
+            for (let j = 0; j < GRID_SIZE; j++) {
+                let sum = 0;
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    sum += currentState[i][j];
+                }
+                lineFlips.push(sum);
+            }
+            let d1 = 0, d2 = 0;
+            for (let i = 0; i < GRID_SIZE; i++) {
+                d1 += currentState[i][i];
+                d2 += currentState[i][GRID_SIZE - 1 - i];
+            }
+            lineFlips.push(d1, d2);
+            return lineFlips;
+        }
+        
+        function calculateBoardScore(lineFlips, attemptsLeft) {
+            let totalScore = 0;
+            for (let flipped of lineFlips) {
+                totalScore += lineValue(flipped, attemptsLeft);
+            }
+            return totalScore;
+        }
+        
+        function lineValue(flipped, attemptsLeft) {
+            if (attemptsLeft <= LOW_ATTEMPT_THRESHOLD) {
+                if (flipped === 5) return 100.0;
+                if (flipped === 4) return 9.0;
+                if (flipped === 3) return 3.0;
+                if (flipped === 2) return 1.0;
+                if (flipped === 1) return 0.3;
+                return 0.0;
+            } else {
+                if (flipped === 5) return 8.0;
+                if (flipped === 4) return 15.0;
+                if (flipped === 3) return 3.0;
+                if (flipped === 2) return 1.0;
+                if (flipped === 1) return 0.3;
+                return 0.0;
+            }
+        }
+        
+        function evaluateTile(r, c, attemptsLeft) {
+            const currentLineFlips = getLineFlips(state);
+            const currentScore = calculateBoardScore(currentLineFlips, attemptsLeft);
+            
+            const tempState = state.map(row => [...row]);
+            tempState[r][c] = 1;
+            const newLineFlips = getLineFlips(tempState);
+            const newScore = calculateBoardScore(newLineFlips, attemptsLeft);
+            
+            const totalBenefit = newScore - currentScore;
+            
+            if (attemptsLeft <= LOW_ATTEMPT_THRESHOLD) {
+                let maxLineBenefit = 0.0;
+                let activeLineCount = 0;
+                const lineIndices = [r, c + 5];
+                if (r === c) lineIndices.push(10);
+                if (r + c === GRID_SIZE - 1) lineIndices.push(11);
+                
+                for (let i of lineIndices) {
+                    const currentFlipped = currentLineFlips[i];
+                    const newFlipped = newLineFlips[i];
+                    if (currentFlipped === 5) continue;
+                    
+                    const currentValue = lineValue(currentFlipped, attemptsLeft);
+                    const newValue = lineValue(newFlipped, attemptsLeft);
+                    const lineBenefit = newValue - currentValue;
+                    
+                    maxLineBenefit = Math.max(maxLineBenefit, lineBenefit);
+                    if (lineBenefit > 0.001) activeLineCount++;
+                }
+                
+                const lineCountBonus = activeLineCount * 0.01;
+                return [maxLineBenefit, totalBenefit + lineCountBonus];
+            } else {
+                const potentialLines = newLineFlips.filter(f => f >= 3 && f < 5).length;
+                const multiFactor = potentialLines > 1 ? 1 + (potentialLines - 1) * 0.5 : 1.0;
+                return newScore * multiFactor;
+            }
+        }
+        
+        function suggestMove() {
+            if (turnFlips >= MAX_FLIPS) {
+                console.log('All flips used — no more suggestions.');
+                return;
+            }
+            
+            const chosenFlipsUsed = Math.floor(turnFlips / 2);
+            const attemptsLeft = TOTAL_CHOSEN_FLIPS - chosenFlipsUsed;
+            
+            const scores = {};
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (state[r][c] === 1) continue;
+                    scores[`${r},${c}`] = evaluateTile(r, c, attemptsLeft);
+                }
+            }
+            
+            const sortedTiles = Object.entries(scores).sort((a, b) => {
+                const scoreA = Array.isArray(a[1]) ? a[1][0] : a[1];
+                const scoreB = Array.isArray(b[1]) ? b[1][0] : b[1];
+                return scoreB - scoreA;
+            });
+            
+            const bestTiles = sortedTiles.slice(0, 3).map(t => t[0]);
+            highlightSuggestions(bestTiles);
+        }
+        
+        function clearHighlights() {
+            for (let key in tiles) {
+                const [r, c] = key.split(',').map(Number);
+                if (state[r][c] === 0) {
+                    tiles[key].className = 'tile';
+                    tiles[key].textContent = '';
+                }
+            }
+        }
+        
+        function highlightSuggestions(bestTiles) {
+            clearHighlights();
+            const classes = ['suggest-1', 'suggest-2', 'suggest-3'];
+            bestTiles.forEach((key, idx) => {
+                const [r, c] = key.split(',').map(Number);
+                if (state[r][c] === 0) {
+                    tiles[key].classList.add(classes[idx]);
+                    tiles[key].textContent = idx + 1;
+                }
+            });
+        }
+        
+        initGrid();
+    </script>
+</body>
+</html>
