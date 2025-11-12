@@ -6,33 +6,88 @@
     <title>BINGO BONGO</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             margin: 0;
+            background: #1e1e1e;
+            transition: background 0.3s ease;
+        }
+        
+        body.light-mode {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         
-        .container {
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: #3e3e42;
+            border: 1px solid #555555;
+            color: #d4d4d4;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+            z-index: 1000;
+        }
+        
+        .theme-toggle:hover {
+            background: #505050;
+        }
+        
+        body.light-mode .theme-toggle {
             background: white;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        
+        body.light-mode .theme-toggle:hover {
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: #252526;
             padding: 30px;
-            border-radius: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            border: 1px solid #3e3e42;
+            transition: all 0.3s ease;
+        }
+        
+        body.light-mode .container {
+            background: white;
             box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            border: none;
         }
         
         h1 {
             text-align: center;
-            color: #333;
+            color: #4ec9b0;
             margin: 0 0 20px 0;
+            font-weight: 600;
+            letter-spacing: 1px;
+            transition: color 0.3s ease;
+        }
+        
+        body.light-mode h1 {
+            color: #333;
         }
         
         .status {
             text-align: center;
             font-size: 18px;
-            font-weight: bold;
+            font-weight: 500;
             margin-bottom: 20px;
+            color: #d4d4d4;
+            transition: color 0.3s ease;
+        }
+        
+        body.light-mode .status {
             color: #555;
         }
         
@@ -46,42 +101,83 @@
         .tile {
             width: 60px;
             height: 60px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            background: #f5f5f5;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            background: #2d2d30;
             cursor: pointer;
             font-size: 20px;
-            font-weight: bold;
+            font-weight: 600;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
+            transition: all 0.15s ease;
+            color: #d4d4d4;
+        }
+        
+        body.light-mode .tile {
+            border: 1px solid #ddd;
+            background: #f5f5f5;
+            color: #333;
         }
         
         .tile:hover {
-            transform: scale(1.05);
+            background: #37373d;
+            border-color: #007acc;
+        }
+        
+        body.light-mode .tile:hover {
             border-color: #999;
+            background: #e8e8e8;
         }
         
         .tile.flipped {
+            background: #4ec9b0;
+            border-color: #4ec9b0;
+            color: #1e1e1e;
+        }
+        
+        body.light-mode .tile.flipped {
             background: #4caf50;
             border-color: #45a049;
             color: white;
         }
         
         .tile.suggest-1 {
+            background: #4fc3f7;
+            border-color: #4fc3f7;
+            color: #1e1e1e;
+            box-shadow: 0 0 15px rgba(79, 195, 247, 0.6);
+        }
+        
+        body.light-mode .tile.suggest-1 {
             background: #FFD700;
             border-color: #DAA520;
+            color: #000;
+            box-shadow: none;
         }
         
         .tile.suggest-2 {
+            background: #569cd6;
+            border-color: #569cd6;
+            color: #1e1e1e;
+        }
+        
+        body.light-mode .tile.suggest-2 {
             background: #FFA500;
             border-color: #FF8C00;
+            color: #000;
         }
         
         .tile.suggest-3 {
+            background: #6e7681;
+            border-color: #6e7681;
+            color: #e0e0e0;
+        }
+        
+        body.light-mode .tile.suggest-3 {
             background: #FFB84D;
             border-color: #FF9800;
+            color: #000;
         }
         
         .controls {
@@ -91,34 +187,55 @@
         }
         
         button {
-            padding: 12px 24px;
-            font-size: 16px;
+            padding: 10px 20px;
+            font-size: 14px;
             border: none;
-            border-radius: 8px;
+            border-radius: 4px;
             cursor: pointer;
-            font-weight: bold;
-            transition: all 0.2s;
+            font-weight: 500;
+            transition: all 0.15s ease;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
         button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transform: translateY(-1px);
         }
         
         .suggest-btn {
-            background: #8888ff;
+            background: #007acc;
+            color: #ffffff;
+        }
+        
+        body.light-mode .suggest-btn {
+            background: #88f;
             color: white;
         }
         
+        .suggest-btn:hover {
+            background: #0098ff;
+        }
+        
         .reset-btn {
-            background: #ff8888;
+            background: #3e3e42;
+            color: #d4d4d4;
+            border: 1px solid #555555;
+        }
+        
+        body.light-mode .reset-btn {
+            background: #f88;
             color: white;
+            border: none;
+        }
+        
+        .reset-btn:hover {
+            background: #505050;
         }
         
 
     </style>
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()">☀️ Light Mode</button>
     <div class="container">
         <h1>BINGO BONGO</h1>
         <div class="status" id="status">Flips used: 0 / 16</div>
@@ -322,6 +439,16 @@
                     tiles[key].textContent = idx + 1;
                 }
             });
+        }
+        
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const btn = document.querySelector('.theme-toggle');
+            if (document.body.classList.contains('light-mode')) {
+                btn.textContent = '🌙 Dark Mode';
+            } else {
+                btn.textContent = '☀️ Light Mode';
+            }
         }
         
         initGrid();
