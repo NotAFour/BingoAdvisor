@@ -120,12 +120,12 @@
             color: #333;
         }
         
-        .tile:hover {
+        .tile:hover:not(.flipped) {
             background: #37373d;
             border-color: #007acc;
         }
         
-        body.light-mode .tile:hover {
+        body.light-mode .tile:hover:not(.flipped) {
             border-color: #999;
             background: #e8e8e8;
         }
@@ -156,34 +156,49 @@
             box-shadow: none;
         }
         
-        .tile.suggest-2 {
-            background: #569cd6;
-            border-color: #569cd6;
-            color: #1e1e1e;
-        }
-        
-        body.light-mode .tile.suggest-2 {
-            background: #FFA500;
-            border-color: #FF8C00;
-            color: #000;
-        }
-        
-        .tile.suggest-3 {
-            background: #6e7681;
-            border-color: #6e7681;
-            color: #e0e0e0;
-        }
-        
-        body.light-mode .tile.suggest-3 {
-            background: #FFB84D;
-            border-color: #FF9800;
-            color: #000;
-        }
-        
         .controls {
             display: flex;
-            gap: 10px;
-            justify-content: center;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .strategy-toggle {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            color: #d4d4d4;
+            font-size: 14px;
+        }
+        
+        body.light-mode .strategy-toggle {
+            color: #555;
+        }
+        
+        .strategy-toggle label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        
+        .strategy-toggle input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+        
+        .strategy-description {
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            max-width: 300px;
+            line-height: 1.4;
+        }
+        
+        body.light-mode .strategy-description {
+            color: #666;
         }
         
         button {
@@ -215,6 +230,20 @@
             background: #0098ff;
         }
         
+        .suggest-btn {
+            background: #007acc;
+            color: #ffffff;
+        }
+        
+        body.light-mode .suggest-btn {
+            background: #88f;
+            color: white;
+        }
+        
+        .suggest-btn:hover {
+            background: #0098ff;
+        }
+        
         .reset-btn {
             background: #3e3e42;
             color: #d4d4d4;
@@ -230,8 +259,6 @@
         .reset-btn:hover {
             background: #505050;
         }
-        
-
     </style>
 </head>
 <body>
@@ -241,21 +268,282 @@
         <div class="status" id="status">Flips used: 0 / 16</div>
         <div class="grid" id="grid"></div>
         <div class="controls">
-            <button class="suggest-btn" onclick="suggestMove()">Suggest Next Move</button>
+            <div class="strategy-toggle">
+                <label>
+                    <input type="checkbox" id="strategyToggle" onchange="toggleStrategy()">
+                    <span>Balanced Strategy (prioritize consistent 3-line wins)</span>
+                </label>
+                <div class="strategy-description" id="strategyDesc">
+                    Current: Aggressive 4-line strategy (~26% 4-line, ~69% 3-line, ~5% 2-line)
+                </div>
+            </div>
             <button class="reset-btn" onclick="resetBoard()">Reset Board</button>
         </div>
-
     </div>
 
     <script>
         const GRID_SIZE = 5;
         const MAX_FLIPS = 16;
-        const TOTAL_CHOSEN_FLIPS = 8;
-        const LOW_ATTEMPT_THRESHOLD = 3;
         
-        let state = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
-        let turnFlips = 0;
+        class Line {
+            constructor() {
+                this.cells = [];
+            }
+            
+            get isComplete() {
+                return this.cells.every(cell => cell.used);
+            }
+        }
+        
+        class Cell {
+            constructor(id, field, row, column) {
+                this.id = id;
+                this.field = field;
+                this.row = row;
+                this.column = column;
+                this.used = false;
+                this.lines = [row, column];
+                this.diagonals = [];
+            }
+            
+            getLineCompletionDesc() {
+                const counts = [];
+                for (const line of this.lines) {
+                    let lineCount = 0;
+                    for (const cell of line.cells) {
+                        if (cell.used) lineCount++;
+                    }
+                    counts.push(lineCount);
+                }
+                return counts.sort((a, b) => b - a);
+            }
+        }
+        
+        class Field {
+            constructor(size = 5) {
+                this.size = size;
+                this.rows = [];
+                this.columns = [];
+                this.diagonals = [new Line(), new Line()];
+                this.cells = [];
+                
+                for (let i = 0; i < size; i++) {
+                    const row = new Line();
+                    this.rows.push(row);
+                    
+                    for (let j = 0; j < size; j++) {
+                        if (i === 0) {
+                            this.columns.push(new Line());
+                        }
+                        
+                        const column = this.columns[j];
+                        const cell = new Cell(i * size + j + 1, this, row, column);
+                        row.cells.push(cell);
+                        column.cells.push(cell);
+                        this.cells.push(cell);
+                        
+                        if (i === j) {
+                            this.diagonals[0].cells.push(cell);
+                            cell.lines.push(this.diagonals[0]);
+                            cell.diagonals.push(this.diagonals[0]);
+                        }
+                        
+                        if (i + j + 1 === size) {
+                            this.diagonals[1].cells.push(cell);
+                            cell.lines.push(this.diagonals[1]);
+                            cell.diagonals.push(this.diagonals[1]);
+                        }
+                    }
+                }
+                
+                this.lines = [...this.columns, ...this.rows, ...this.diagonals];
+            }
+            
+            get linesCompleted() {
+                return this.lines.filter(line => line.isComplete).length;
+            }
+            
+            reset() {
+                this.cells.forEach(cell => cell.used = false);
+            }
+            
+            finishable(targetPattern, maxMoves) {
+                let movesNeeded = 0;
+                for (let i = 0; i < this.cells.length; i++) {
+                    if (targetPattern.cells[i].used && !this.cells[i].used) {
+                        movesNeeded++;
+                        if (movesNeeded > maxMoves) return false;
+                    }
+                }
+                return true;
+            }
+            
+            clone() {
+                const clone = new Field(this.size);
+                for (let i = 0; i < this.cells.length; i++) {
+                    clone.cells[i].used = this.cells[i].used;
+                }
+                return clone;
+            }
+        }
+        
+        function createPatterns(targetLines = 4, maxMoves = 16, field = new Field(), line = 1, index = 0, indices = [], patterns = {}) {
+            for (; index < field.lines.length - targetLines + line; index++) {
+                indices.push(index);
+                
+                if (line === targetLines) {
+                    for (const lineIndex of indices) {
+                        for (let cellIndex = 0; cellIndex < field.lines[lineIndex].cells.length; cellIndex++) {
+                            field.lines[lineIndex].cells[cellIndex].used = true;
+                        }
+                    }
+                    
+                    let moves = field.cells.filter(cell => cell.used).length;
+                    
+                    if (moves <= maxMoves) {
+                        if (!patterns[moves]) patterns[moves] = [];
+                        patterns[moves].push(field.clone());
+                    }
+                    
+                    field.reset();
+                } else {
+                    createPatterns(targetLines, maxMoves, field, line + 1, index + 1, indices, patterns);
+                }
+                
+                indices.pop();
+            }
+            
+            return patterns;
+        }
+        
+        function getMostCompleteCell(cells) {
+            let bestCell = null;
+            let bestCounts = [];
+            
+            for (const cell of cells) {
+                if (cell.used) continue;
+                
+                const counts = cell.getLineCompletionDesc();
+                
+                for (let i = 0; i < counts.length || i < bestCounts.length; i++) {
+                    if (bestCounts[i] === undefined || counts[i] > bestCounts[i]) {
+                        bestCounts = counts;
+                        bestCell = cell;
+                        break;
+                    } else if (counts[i] === undefined || counts[i] < bestCounts[i]) {
+                        break;
+                    }
+                }
+            }
+            
+            return bestCell;
+        }
+        
+        function createHeatmap(patterns) {
+            const heatmap = Array(patterns[0].cells.length).fill(0);
+            
+            for (const pattern of patterns) {
+                for (let i = 0; i < pattern.cells.length; i++) {
+                    if (pattern.cells[i].used) {
+                        heatmap[i]++;
+                    }
+                }
+            }
+            
+            return heatmap;
+        }
+        
+        function getHeatMapOfBestPatterns(field, remainingMoves) {
+            let patterns = [];
+            
+            for (const patternLib of currentPatternLibs) {
+                patterns = patternLib.patterns.filter(pattern => 
+                    field.finishable(pattern, remainingMoves - patternLib.remainingMovesOffset)
+                );
+                
+                if (patterns.length > 0) break;
+            }
+            
+            if (patterns.length === 0) return null;
+            
+            return createHeatmap(patterns);
+        }
+        
+        function getHottestCell(field, remainingMoves) {
+            const heatmap = getHeatMapOfBestPatterns(field, remainingMoves);
+            
+            if (!heatmap) {
+                return getMostCompleteCell(field.cells);
+            }
+            
+            let baseCells = field.cells;
+            let hotCells = [];
+            
+            do {
+                let maxHeat = Number.NEGATIVE_INFINITY;
+                
+                for (const cell of baseCells) {
+                    if (cell.used) continue;
+                    
+                    const heat = heatmap[cell.id - 1];
+                    
+                    if (heat > maxHeat) {
+                        maxHeat = heat;
+                        hotCells = [cell];
+                    } else if (heat === maxHeat) {
+                        hotCells.push(cell);
+                    }
+                }
+                
+                if (hotCells.length === 1) break;
+                
+                remainingMoves--;
+                const nextHeatmap = getHeatMapOfBestPatterns(field, remainingMoves);
+                
+                if (!nextHeatmap || remainingMoves === 1) break;
+                
+                baseCells = hotCells;
+                hotCells = [];
+            } while (true);
+            
+            return getMostCompleteCell(hotCells);
+        }
+        
+        const fourLinePatterns = createPatterns(4);
+        const allFourLinePatterns = [].concat(...Object.values(fourLinePatterns));
+        
+        const threeLinePatterns = createPatterns(3);
+        const allThreeLinePatterns = [].concat(...Object.values(threeLinePatterns));
+        
+        const allTwoLinePatterns = [].concat(...Object.values(createPatterns(2)));
+        
+        // Aggressive 4-line strategy pattern library
+        const aggressivePatternLibs = [
+            { lines: 4, patterns: allFourLinePatterns, remainingMovesOffset: 2 },
+            { lines: 4, patterns: allFourLinePatterns, remainingMovesOffset: 1 },
+            { lines: 4, patterns: allFourLinePatterns, remainingMovesOffset: 0 },
+            { lines: 3, patterns: allThreeLinePatterns, remainingMovesOffset: 1 },
+            { lines: 3, patterns: allThreeLinePatterns, remainingMovesOffset: 0 },
+            { lines: 2, patterns: allTwoLinePatterns, remainingMovesOffset: 1 },
+            { lines: 2, patterns: allTwoLinePatterns, remainingMovesOffset: 0 },
+        ];
+        
+        // Balanced 3-line strategy pattern library
+        const balancedPatternLibs = [
+            { lines: 3, patterns: allThreeLinePatterns, remainingMovesOffset: 2 },
+            { lines: 3, patterns: allThreeLinePatterns, remainingMovesOffset: 1 },
+            { lines: 4, patterns: allFourLinePatterns, remainingMovesOffset: 1 },
+            { lines: 3, patterns: allThreeLinePatterns, remainingMovesOffset: 0 },
+            { lines: 4, patterns: allFourLinePatterns, remainingMovesOffset: 0 },
+            { lines: 2, patterns: allTwoLinePatterns, remainingMovesOffset: 1 },
+            { lines: 2, patterns: allTwoLinePatterns, remainingMovesOffset: 0 },
+        ];
+        
+        let currentPatternLibs = aggressivePatternLibs;
+        
+        const field = new Field();
         let tiles = {};
+        let turnFlips = 0;
         
         function initGrid() {
             const grid = document.getElementById('grid');
@@ -271,174 +559,73 @@
         }
         
         function toggleTile(r, c) {
-            if (state[r][c] === 1) {
-                state[r][c] = 0;
+            const cellId = r * GRID_SIZE + c;
+            const cell = field.cells[cellId];
+            
+            if (cell.used) {
+                cell.used = false;
                 tiles[`${r},${c}`].className = 'tile';
-                tiles[`${r},${c}`].textContent = '';
                 turnFlips--;
             } else {
-                if (turnFlips >= MAX_FLIPS) {
-                    console.log('All 16 flips used.');
-                    return;
-                }
-                state[r][c] = 1;
+                if (turnFlips >= MAX_FLIPS) return;
+                cell.used = true;
                 tiles[`${r},${c}`].className = 'tile flipped';
-                tiles[`${r},${c}`].textContent = '';
                 turnFlips++;
             }
+            
             clearHighlights();
             updateStatus();
+            
+            if (turnFlips < MAX_FLIPS && turnFlips % 2 === 0) {
+                suggestMove();
+            }
         }
         
         function resetBoard() {
-            state = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            field.reset();
             for (let key in tiles) {
                 tiles[key].className = 'tile';
-                tiles[key].textContent = '';
             }
             turnFlips = 0;
             updateStatus();
-            document.getElementById('debug').classList.remove('visible');
+            suggestMove();
         }
         
         function updateStatus() {
             document.getElementById('status').textContent = `Flips used: ${turnFlips} / ${MAX_FLIPS}`;
         }
         
-        function getLineFlips(currentState) {
-            const lineFlips = [];
-            for (let i = 0; i < GRID_SIZE; i++) {
-                lineFlips.push(currentState[i].reduce((a, b) => a + b, 0));
-            }
-            for (let j = 0; j < GRID_SIZE; j++) {
-                let sum = 0;
-                for (let i = 0; i < GRID_SIZE; i++) {
-                    sum += currentState[i][j];
-                }
-                lineFlips.push(sum);
-            }
-            let d1 = 0, d2 = 0;
-            for (let i = 0; i < GRID_SIZE; i++) {
-                d1 += currentState[i][i];
-                d2 += currentState[i][GRID_SIZE - 1 - i];
-            }
-            lineFlips.push(d1, d2);
-            return lineFlips;
-        }
-        
-        function calculateBoardScore(lineFlips, attemptsLeft) {
-            let totalScore = 0;
-            for (let flipped of lineFlips) {
-                totalScore += lineValue(flipped, attemptsLeft);
-            }
-            return totalScore;
-        }
-        
-        function lineValue(flipped, attemptsLeft) {
-            if (attemptsLeft <= LOW_ATTEMPT_THRESHOLD) {
-                if (flipped === 5) return 100.0;
-                if (flipped === 4) return 9.0;
-                if (flipped === 3) return 3.0;
-                if (flipped === 2) return 1.0;
-                if (flipped === 1) return 0.3;
-                return 0.0;
-            } else {
-                if (flipped === 5) return 8.0;
-                if (flipped === 4) return 15.0;
-                if (flipped === 3) return 3.0;
-                if (flipped === 2) return 1.0;
-                if (flipped === 1) return 0.3;
-                return 0.0;
-            }
-        }
-        
-        function evaluateTile(r, c, attemptsLeft) {
-            const currentLineFlips = getLineFlips(state);
-            const currentScore = calculateBoardScore(currentLineFlips, attemptsLeft);
-            
-            const tempState = state.map(row => [...row]);
-            tempState[r][c] = 1;
-            const newLineFlips = getLineFlips(tempState);
-            const newScore = calculateBoardScore(newLineFlips, attemptsLeft);
-            
-            const totalBenefit = newScore - currentScore;
-            
-            if (attemptsLeft <= LOW_ATTEMPT_THRESHOLD) {
-                let maxLineBenefit = 0.0;
-                let activeLineCount = 0;
-                const lineIndices = [r, c + 5];
-                if (r === c) lineIndices.push(10);
-                if (r + c === GRID_SIZE - 1) lineIndices.push(11);
-                
-                for (let i of lineIndices) {
-                    const currentFlipped = currentLineFlips[i];
-                    const newFlipped = newLineFlips[i];
-                    if (currentFlipped === 5) continue;
-                    
-                    const currentValue = lineValue(currentFlipped, attemptsLeft);
-                    const newValue = lineValue(newFlipped, attemptsLeft);
-                    const lineBenefit = newValue - currentValue;
-                    
-                    maxLineBenefit = Math.max(maxLineBenefit, lineBenefit);
-                    if (lineBenefit > 0.001) activeLineCount++;
-                }
-                
-                const lineCountBonus = activeLineCount * 0.01;
-                return [maxLineBenefit, totalBenefit + lineCountBonus];
-            } else {
-                const potentialLines = newLineFlips.filter(f => f >= 3 && f < 5).length;
-                const multiFactor = potentialLines > 1 ? 1 + (potentialLines - 1) * 0.5 : 1.0;
-                return newScore * multiFactor;
-            }
-        }
-        
         function suggestMove() {
-            if (turnFlips >= MAX_FLIPS) {
-                console.log('All flips used — no more suggestions.');
-                return;
-            }
+            if (turnFlips >= MAX_FLIPS) return;
             
             const chosenFlipsUsed = Math.floor(turnFlips / 2);
-            const attemptsLeft = TOTAL_CHOSEN_FLIPS - chosenFlipsUsed;
+            const attemptsLeft = 8 - chosenFlipsUsed;
             
-            const scores = {};
-            for (let r = 0; r < GRID_SIZE; r++) {
-                for (let c = 0; c < GRID_SIZE; c++) {
-                    if (state[r][c] === 1) continue;
-                    scores[`${r},${c}`] = evaluateTile(r, c, attemptsLeft);
-                }
+            const bestCell = getHottestCell(field, attemptsLeft);
+            
+            if (bestCell) {
+                const r = Math.floor((bestCell.id - 1) / GRID_SIZE);
+                const c = (bestCell.id - 1) % GRID_SIZE;
+                highlightSuggestion(r, c);
             }
-            
-            const sortedTiles = Object.entries(scores).sort((a, b) => {
-                const scoreA = Array.isArray(a[1]) ? a[1][0] : a[1];
-                const scoreB = Array.isArray(b[1]) ? b[1][0] : b[1];
-                return scoreB - scoreA;
-            });
-            
-            const bestTiles = sortedTiles.slice(0, 3).map(t => t[0]);
-            highlightSuggestions(bestTiles);
         }
         
         function clearHighlights() {
             for (let key in tiles) {
                 const [r, c] = key.split(',').map(Number);
-                if (state[r][c] === 0) {
+                const cellId = r * GRID_SIZE + c;
+                if (!field.cells[cellId].used) {
                     tiles[key].className = 'tile';
-                    tiles[key].textContent = '';
                 }
             }
         }
         
-        function highlightSuggestions(bestTiles) {
+        function highlightSuggestion(r, c) {
             clearHighlights();
-            const classes = ['suggest-1', 'suggest-2', 'suggest-3'];
-            bestTiles.forEach((key, idx) => {
-                const [r, c] = key.split(',').map(Number);
-                if (state[r][c] === 0) {
-                    tiles[key].classList.add(classes[idx]);
-                    tiles[key].textContent = idx + 1;
-                }
-            });
+            const cellId = r * GRID_SIZE + c;
+            if (!field.cells[cellId].used) {
+                tiles[`${r},${c}`].classList.add('suggest-1');
+            }
         }
         
         function toggleTheme() {
@@ -451,7 +638,26 @@
             }
         }
         
+        function toggleStrategy() {
+            const checkbox = document.getElementById('strategyToggle');
+            const desc = document.getElementById('strategyDesc');
+            
+            if (checkbox.checked) {
+                currentPatternLibs = balancedPatternLibs;
+                desc.textContent = 'Current: Balanced 3-line strategy (prioritizes consistent 3-line wins, opportunistic 4-lines)';
+            } else {
+                currentPatternLibs = aggressivePatternLibs;
+                desc.textContent = 'Current: Aggressive 4-line strategy (~26% 4-line, ~69% 3-line, ~5% 2-line)';
+            }
+            
+            if (turnFlips > 0 && turnFlips < MAX_FLIPS && turnFlips % 2 === 0) {
+                clearHighlights();
+                suggestMove();
+            }
+        }
+        
         initGrid();
+        suggestMove();
     </script>
 </body>
 </html>
