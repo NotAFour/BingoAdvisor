@@ -57,6 +57,7 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             border: 1px solid #3e3e42;
             transition: all 0.3s ease;
+            position: relative;
         }
         
         body.light-mode .container {
@@ -201,6 +202,128 @@
             color: #666;
         }
         
+        .info-button {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            width: 32px;
+            height: 32px;
+            background: #3e3e42;
+            border: 1px solid #555555;
+            color: #d4d4d4;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+        
+        .info-button:hover {
+            background: #505050;
+            transform: scale(1.1);
+        }
+        
+        body.light-mode .info-button {
+            background: white;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        
+        body.light-mode .info-button:hover {
+            background: #f5f5f5;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: #252526;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid #3e3e42;
+            position: relative;
+            color: #d4d4d4;
+            line-height: 1.6;
+        }
+        
+        body.light-mode .modal-content {
+            background: white;
+            color: #333;
+            border: none;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #d4d4d4;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+        
+        .modal-close:hover {
+            background: #3e3e42;
+            transform: none;
+        }
+        
+        body.light-mode .modal-close {
+            color: #333;
+        }
+        
+        body.light-mode .modal-close:hover {
+            background: #f0f0f0;
+        }
+        
+        .modal-content h2 {
+            color: #4ec9b0;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        
+        body.light-mode .modal-content h2 {
+            color: #667eea;
+        }
+        
+        .modal-content p {
+            margin: 10px 0;
+        }
+        
+        .modal-content strong {
+            color: #4ec9b0;
+        }
+        
+        body.light-mode .modal-content strong {
+            color: #667eea;
+        }
+        
         button {
             padding: 10px 20px;
             font-size: 14px;
@@ -263,7 +386,19 @@
 </head>
 <body>
     <button class="theme-toggle" onclick="toggleTheme()">☀️ Light Mode</button>
+    
+    <div class="modal" id="infoModal" onclick="closeModalOnBackdrop(event)">
+        <div class="modal-content">
+            <button class="modal-close" onclick="toggleModal()">×</button>
+            <h2>Strategy Guide</h2>
+            <p><strong>Aggressive Strategy:</strong> Best when the 4th reward is particularly valuable (like 5 gold tears or other rare items). This strategy maximizes your chance of completing 4 lines (~26%) but has a higher risk of ending with only 2 lines (~5%).</p>
+            <p><strong>Balanced Strategy:</strong> Recommended for most situations. This strategy prioritizes consistent 3-line completions while still taking opportunistic shots at 4 lines. It significantly reduces the risk of 2-line outcomes.</p>
+            <p><strong>Pro Tip:</strong> Check your 4th reward before each round. If it's something you really want, switch to aggressive. Otherwise, play it safe with the balanced strategy for more reliable rewards.</p>
+        </div>
+    </div>
+    
     <div class="container">
+        <button class="info-button" onclick="toggleModal()">i</button>
         <h1>BINGO BONGO</h1>
         <div class="status" id="status">Flips used: 0 / 16</div>
         <div class="grid" id="grid"></div>
@@ -517,7 +652,6 @@
         
         const allTwoLinePatterns = [].concat(...Object.values(createPatterns(2)));
         
-        // Aggressive 4-line strategy pattern library
         const aggressivePatternLibs = [
             { lines: 4, patterns: allFourLinePatterns, remainingMovesOffset: 2 },
             { lines: 4, patterns: allFourLinePatterns, remainingMovesOffset: 1 },
@@ -528,7 +662,6 @@
             { lines: 2, patterns: allTwoLinePatterns, remainingMovesOffset: 0 },
         ];
         
-        // Balanced 3-line strategy pattern library
         const balancedPatternLibs = [
             { lines: 3, patterns: allThreeLinePatterns, remainingMovesOffset: 2 },
             { lines: 3, patterns: allThreeLinePatterns, remainingMovesOffset: 1 },
@@ -544,6 +677,17 @@
         const field = new Field();
         let tiles = {};
         let turnFlips = 0;
+        
+        function toggleModal() {
+            const modal = document.getElementById('infoModal');
+            modal.classList.toggle('active');
+        }
+        
+        function closeModalOnBackdrop(event) {
+            if (event.target.id === 'infoModal') {
+                toggleModal();
+            }
+        }
         
         function initGrid() {
             const grid = document.getElementById('grid');
